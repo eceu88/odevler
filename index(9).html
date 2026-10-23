@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slice & Order - Retro Arcade Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: 'Press Start 2P', monospace;
+        }
+
+        body {
+            background-color: #0d0e15;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 700px;
+            background: #111428;
+            border: 4px solid #ff0055;
+            box-shadow: 0 0 20px rgba(255, 0, 85, 0.4), inset 0 0 15px rgba(0, 0, 0, 0.8);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        /* MENU BACKGROUND CANVAS */
+        #bgCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* HUD / TOP BAR */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 70px;
+            background-color: rgba(15, 15, 30, 0.95);
+            border-bottom: 3px solid #ffcc00;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            font-size: 10px;
+            z-index: 10;
+        }
+
+        .hud-box {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .hud-label {
+            color: #8899ac;
+            font-size: 8px;
+        }
+
+        .hud-value {
+            color: #ffcc00;
+            font-size: 12px;
+        }
+
+        .complaints-box {
+            display: flex;
+            gap: 5px;
+        }
+
+        /* RECIPE CARD OVERLAY */
+        #recipe-card {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            background-color: #fce8c3;
+            border: 4px solid #8b4513;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            color: #4a2506;
+            box-shadow: 0 8px 0 rgba(0,0,0,0.6);
+            z-index: 20;
+            transition: all 0.3s ease;
+        }
+
+        #recipe-card.hidden {
+            display: none;
+        }
+
+        #recipe-card h3 {
+            font-size: 11px;
+            margin-bottom: 10px;
+            color: #a82300;
+            text-decoration: underline;
+        }
+
+        .recipe-items {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .recipe-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            font-size: 8px;
+            font-weight: bold;
+        }
+
+        .recipe-item img {
+            width: 52px;
+            height: 52px;
+            image-rendering: pixelated;
+            filter: drop-shadow(2px 2px 0px rgba(0,0,0,0.4));
+        }
+
+        /* MAIN GAME CANVAS */
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            cursor: crosshair;
+        }
+
+        /* SCREENS / OVERLAYS */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(13, 14, 21, 0.3); /* Transparent to show bgCanvas */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 25px;
+            text-align: center;
+            z-index: 30;
+            overflow: hidden;
+        }
+
+        .screen.hidden {
+            display: none;
+        }
+
+        #result-screen {
+            background: rgba(13, 14, 21, 0.95);
+        }
+
+        .game-title {
+            font-size: 26px;
+            color: #ff0055;
+            text-shadow: 3px 3px 0px #ffcc00, 6px 6px 0px #000;
+            margin-bottom: 15px;
+            line-height: 1.3;
+            z-index: 10;
+        }
+
+        .game-subtitle {
+            font-size: 9px;
+            color: #fff;
+            background: rgba(0,0,0,0.8);
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+            border: 2px solid #00ffcc;
+            z-index: 10;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 280px;
+            z-index: 10;
+        }
+
+        .pixel-btn {
+            background-color: #ffcc00;
+            color: #000;
+            border: 4px solid #fff;
+            padding: 12px 10px;
+            font-size: 10px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #b38f00, 0 10px 10px rgba(0,0,0,0.5);
+            transition: all 0.1s ease;
+        }
+
+        .pixel-btn:hover {
+            background-color: #ffe680;
+            transform: translateY(-2px);
+        }
+
+        .pixel-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #b38f00;
+        }
+
+        .pixel-btn.secondary {
+            background-color: #00ccff;
+            box-shadow: 0 6px 0 #0088cc;
+        }
+
+        .pixel-btn.accent {
+            background-color: #ff0055;
+            color: #fff;
+            box-shadow: 0 6px 0 #990033;
+        }
+        
+        .pixel-btn.small {
+            padding: 8px;
+            font-size: 8px;
+            background-color: #ff3366;
+            color: white;
+            border-color: #fff;
+            box-shadow: 0 4px 0 #990033;
+        }
+        
+        .pixel-btn.small:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #990033;
+        }
+
+        /* MODAL POPUPS */
+        .modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 40;
+            overflow-y: auto;
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background-color: #1a1c38;
+            border: 4px solid #00ffcc;
+            border-radius: 8px;
+            padding: 20px;
+            width: 100%;
+            max-height: 85%;
+            overflow-y: auto;
+            color: #ddd;
+            font-size: 8px;
+            line-height: 1.8;
+            text-align: left;
+        }
+
+        .modal-title {
+            color: #ffcc00;
+            font-size: 12px;
+            text-align: center;
+            margin-bottom: 15px;
+            border-bottom: 2px dashed #ffcc00;
+            padding-bottom: 10px;
+        }
+
+        .modal-section {
+            margin-bottom: 15px;
+        }
+
+        .modal-section h4 {
+            color: #ff0055;
+            margin-bottom: 5px;
+            font-size: 9px;
+        }
+
+        .modal-close-btn {
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        /* LINK INPUT BOX */
+        .link-box {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .link-input {
+            width: 100%;
+            background: #0d0e15;
+            border: 2px solid #00ffcc;
+            color: #00ffcc;
+            padding: 8px;
+            font-size: 7px;
+            border-radius: 4px;
+            outline: none;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- MENU BACKGROUND ART CANVAS -->
+    <canvas id="bgCanvas" width="400" height="700"></canvas>
+
+    <!-- HUD BAR -->
+    <div id="hud">
+        <div class="hud-box">
+            <span class="hud-label">SKOR</span>
+            <span id="score-display" class="hud-value">0</span>
+        </div>
+        <div class="hud-box">
+            <span class="hud-label">ŞİKÂYET</span>
+            <div id="complaints-display" class="complaints-box">
+                <!-- Complaints generated by JS -->
+            </div>
+        </div>
+        <div class="hud-box" style="flex-direction: row; align-items: center; gap: 10px;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+                <span class="hud-label">SÜRE</span>
+                <span id="time-display" class="hud-value">02:00</span>
+            </div>
+            <button id="pause-btn" class="pixel-btn small">||</button>
+        </div>
+    </div>
+
+    <!-- RECIPE CARD -->
+    <div id="recipe-card" class="hidden">
+        <h3 id="recipe-title">SİPARİŞ TARİFİ</h3>
+        <div id="recipe-items" class="recipe-items"></div>
+    </div>
+
+    <!-- MAIN GAME CANVAS -->
+    <canvas id="gameCanvas" width="400" height="700"></canvas>
+
+    <!-- START SCREEN -->
+    <div id="start-screen" class="screen">
+        <h1 class="game-title">SLICE & ORDER</h1>
+        <p class="game-subtitle">Kısa süre gösterilen siparişteki malzemeleri aklında tut, doğru olanları kes!</p>
+        
+        <div class="btn-group">
+            <button id="start-btn" class="pixel-btn">1. OYUNA BAŞLA</button>
+            <button id="how-to-btn" class="pixel-btn secondary">2. NASIL OYNANIR?</button>
+            <button id="chat-link-btn" class="pixel-btn accent">3. SOHBET LİNKİ / PAYLAŞ</button>
+        </div>
+    </div>
+
+    <!-- RESULT / GAME OVER SCREEN -->
+    <div id="result-screen" class="screen hidden">
+        <h1 id="result-title" class="game-title">VARDİYA BİTTİ</h1>
+        <p id="result-reason" style="font-size: 9px; color: #ff3366; margin-bottom: 20px; line-height: 1.5;"></p>
+
+        <div style="background: #111428; border: 2px solid #ffcc00; padding: 15px; width: 100%; margin-bottom: 20px; text-align: left; font-size: 9px; line-height: 2;">
+            <div>TOPLAM SKOR: <span id="final-score" style="color: #ffcc00;">0</span></div>
+            <div>TAMAMLANAN SİPARİŞ: <span id="final-orders" style="color: #00ffcc;">0</span></div>
+        </div>
+
+        <div class="btn-group">
+            <button id="restart-btn" class="pixel-btn">YENİDEN OYNA</button>
+            <button id="menu-btn" class="pixel-btn secondary">ANA MENÜ</button>
+        </div>
+    </div>
+    
+    <!-- PAUSE MODAL -->
+    <div id="pause-modal" class="modal hidden">
+        <div class="modal-content" style="text-align: center;">
+            <h1 class="game-title" style="font-size: 16px; margin-bottom: 25px;">OYUN DURDURULDU</h1>
+            <div class="btn-group" style="margin: 0 auto;">
+                <button id="resume-btn" class="pixel-btn">DEVAM ET</button>
+                <button id="pause-chat-btn" class="pixel-btn secondary">SOHBET LİNKİ</button>
+                <button id="pause-menu-btn" class="pixel-btn accent">ANA MENÜ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 1: HOW TO PLAY & INSPIRATION -->
+    <div id="how-to-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-title">NASIL OYNANIR & İLHAM</div>
+            <div class="modal-section">
+                <h4>🎯 OYUNUN AMACI</h4>
+                <p>2 dakikalık vardiya boyunca müşterilerin siparişlerini hatasız ve hızlı şekilde tamamla!</p>
+            </div>
+            <div class="modal-section">
+                <h4>🧠 HAFIZA & KESME</h4>
+                <p>• Her sipariş başında malzemelik Tarif Kartı açılır ve birkaç saniye sonra kapanır.</p>
+                <p>• Ekranda süzülen malzemeler arasından SADECE tariftekileri kes!</p>
+                <p>• Tarifteki doğru malzemeyi tarif bitene kadar defalarca kesebilirsin, cezası yoktur.</p>
+                <p>• <b>ÖNEMLİ:</b> Sadece yeni tarif verildikten SONRA ekrana düşen malzemelerden sorumlusun. Önceki tariften ekranda kalan malzemeler sana ceza puanı yazmaz!</p>
+            </div>
+            <div class="modal-section">
+                <h4>🏆 PUANLAMA & ŞİKÂYET</h4>
+                <p>• Doğru Malzeme (İlk Kesim): +10 Puan</p>
+                <p>• Sipariş Tamamlama: +25 Bonus Puan</p>
+                <p>• Yanlış Malzeme Kesmek: 1 Şikâyet (Puan düşmez)</p>
+                <p style="color:#ffcc00;">• DİKKAT: İstenen bir malzemeyi kesmeyi unutur ve ekrandan kaçırırsan <b>-10 Puan</b> yersin ve <b>1 Şikâyet</b> alırsın!</p>
+                <p>• Toplam 3 Şikâyette oyun biter!</p>
+            </div>
+        </div>
+        <button id="close-how-to" class="pixel-btn modal-close-btn">KAPAT</button>
+    </div>
+
+    <!-- MODAL 2: CHAT LINK / SHARE -->
+    <div id="chat-link-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-title">SOHBET LİNKİ</div>
+            <p>Bu projenin oluşturulduğu sohbet bağlantısı:</p>
+            <div class="link-box">
+                <input type="text" id="chat-url-input" class="link-input" value="https://share.gemini.google/95kN9jY2m6wz" readonly>
+                <button id="copy-link-btn" class="pixel-btn secondary">LİNKİ KOPYALA</button>
+            </div>
+        </div>
+        <button id="close-chat-link" class="pixel-btn modal-close-btn">KAPAT</button>
+    </div>
+</div>
+
+<script>
+    // --- AUDIO SYSTEM (Web Audio API) ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function playSound(type) {
+        if (!audioCtx) audioCtx = new AudioContext();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        if (type === 'error') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+        } else if (type === 'win') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
+            osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.3);
+            
+            gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.6);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.6);
+        } else if (type === 'lose') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.4);
+            
+            gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.4);
+        }
+    }
+
+    // --- DETAILED & MUTED FESTIVAL MENU BACKGROUND ---
+    function drawMenuBackground() {
+        const bgCanvas = document.getElementById('bgCanvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        bgCtx.imageSmoothingEnabled = false;
+        
+        // Dark muted night sky
+        bgCtx.fillStyle = '#171520';
+        bgCtx.fillRect(0, 0, 400, 700);
+
+        // Muted Stars
+        bgCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        for(let i=0; i<60; i++) {
+            bgCtx.fillRect(Math.random()*400, Math.random()*400, 2, 2);
+        }
+        
+        // Festival String
+        bgCtx.beginPath();
+        bgCtx.strokeStyle = '#222';
+        bgCtx.moveTo(0, 80);
+        bgCtx.quadraticCurveTo(200, 150, 400, 80);
+        bgCtx.stroke();
+        
+        // Bunting / Flags (Muted Palette)
+        const flagColors = ['#402a30', '#2a3a40', '#403a2a'];
+        for(let i=0; i<12; i++) {
+            let x = i * 33 + 10;
+            let y = 80 + Math.pow((x-200)/15, 2)*0.35;
+            bgCtx.fillStyle = flagColors[i%3];
+            bgCtx.beginPath();
+            bgCtx.moveTo(x, y);
+            bgCtx.lineTo(x+15, y);
+            bgCtx.lineTo(x+7, y+20);
+            bgCtx.fill();
+        }
+
+        // Background silhouette buildings/tents
+        bgCtx.fillStyle = '#0f0e15';
+        bgCtx.fillRect(20, 350, 80, 200);
+        bgCtx.fillRect(100, 300, 120, 250);
+        bgCtx.fillRect(280, 380, 90, 150);
+
+        // Food Truck (Muted, detailed)
+        // Body
+        bgCtx.fillStyle = '#3a2028'; 
+        bgCtx.fillRect(40, 420, 320, 240);
+        
+        // Truck Roof
+        bgCtx.fillStyle = '#222';
+        bgCtx.fillRect(35, 410, 330, 10);
+        
+        // Tires
+        bgCtx.fillStyle = '#050505';
+        bgCtx.fillRect(70, 640, 50, 40);
+        bgCtx.fillRect(280, 640, 50, 40);
+        // Hubcaps
+        bgCtx.fillStyle = '#333';
+        bgCtx.fillRect(80, 650, 30, 20);
+        bgCtx.fillRect(290, 650, 30, 20);
+
+        // Serving Window (Darker inside)
+        bgCtx.fillStyle = '#111';
+        bgCtx.fillRect(60, 470, 280, 110);
+        
+        // Chef Silhouette inside
+        bgCtx.fillStyle = '#222';
+        bgCtx.fillRect(180, 510, 40, 70); // Body
+        bgCtx.fillRect(190, 490, 20, 20); // Head
+        bgCtx.fillStyle = '#1a1a1a';
+        bgCtx.fillRect(185, 470, 30, 20); // Hat
+
+        // Awning
+        for(let i=0; i<8; i++) {
+            bgCtx.fillStyle = (i%2===0) ? '#2d1f22' : '#3d2b2f';
+            bgCtx.fillRect(60 + i*35, 450, 35, 20);
+            bgCtx.beginPath();
+            bgCtx.arc(60 + i*35 + 17.5, 470, 17.5, 0, Math.PI);
+            bgCtx.fill();
+        }
+
+        // Counter
+        bgCtx.fillStyle = '#221719';
+        bgCtx.fillRect(50, 580, 300, 20);
+        
+        // Menu board on the side
+        bgCtx.fillStyle = '#1a1a1a';
+        bgCtx.fillRect(70, 490, 40, 60);
+        bgCtx.fillStyle = '#333';
+        bgCtx.fillRect(75, 495, 30, 5);
+        bgCtx.fillRect(75, 505, 30, 5);
+        bgCtx.fillRect(75, 515, 30, 5);
+
+        // Subtle glow from window
+        bgCtx.fillStyle = 'rgba(255, 200, 100, 0.03)';
+        bgCtx.fillRect(60, 470, 280, 110);
+    }
+    
+    // Call it immediately
+    drawMenuBackground();
+
+    const CANVAS_WIDTH = 400;
+    const CANVAS_HEIGHT = 700;
+
+    // Updated colors to be much more vibrant
+    const INGREDIENTS = [
+        { id: 'meat', name: 'Et', color: '#a0522d' },
+        { id: 'cheese', name: 'Peynir', color: '#ffe600' },
+        { id: 'bread', name: 'Ekmek', color: '#d98a44' },
+        { id: 'lettuce', name: 'Marul', color: '#00ff00' },
+        { id: 'pepper', name: 'Biber', color: '#ff0000' },
+        { id: 'tomato', name: 'Domates', color: '#ff1a1a' }
+    ];
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const startScreen = document.getElementById('start-screen');
+    const resultScreen = document.getElementById('result-screen');
+    const recipeCard = document.getElementById('recipe-card');
+    const recipeItemsContainer = document.getElementById('recipe-items');
+    const scoreDisplay = document.getElementById('score-display');
+    const complaintsDisplay = document.getElementById('complaints-display');
+    const timeDisplay = document.getElementById('time-display');
+
+    let isPlaying = false;
+    let isPaused = false;
+    let score = 0;
+    let complaints = 0;
+    let completedOrders = 0;
+    let gameTime = 120;
+    let gameTimerInterval = null;
+
+    let currentRecipe = []; 
+    let slicedIngredientsCurrentOrder = []; 
+    let activeItems = []; 
+    let sliceTrail = []; 
+    let splatters = [];
+    let isMouseDown = false;
+
+    let recipeHideTimeout = null;
+    let speedMultiplier = 1.0; 
+    let recipeVisibilityDuration = 4000;
+    let currentOrderId = 0; // Tracks which order is currently active to prevent unfair penalties
+
+    // --- DETAILED PIXEL ART GENERATOR USING MATRICES ---
+    // Updated colorMap with more vibrant colors
+    const colorMap = {
+        '0': 'transparent',
+        '1': '#111111', // Outline
+        'R': '#ff0000', // Vibrant Red
+        'D': '#d00000', // Dark Red
+        'L': '#ff4444', // Light Red
+        'G': '#00ff00', // Vibrant Green
+        'g': '#00b300', // Dark Green
+        'l': '#55ff55', // Light Green
+        'Y': '#ffe600', // Vibrant Yellow
+        'y': '#ffb300', // Dark Yellow
+        'B': '#a0522d', // Brown
+        'b': '#703a16', // Dark Brown
+        'W': '#fff3e0', // Bone / Bread Highlight
+        'O': '#d98a44', // Bread Crust
+        'o': '#ffcc88'  // Bread Crumb
+    };
+
+    const spriteMatrices = {
+        'meat': [
+            "00011111000000",
+            "001BBBBB111100",
+            "01BBbBBBBBBB10",
+            "1BBbB11W1BBBB1",
+            "1Bbb1WWWW1BBB1",
+            "1BBb1WWWW1BBb1",
+            "01BBb11W1Bbb10",
+            "001BBBbBBBbb10",
+            "00011111111100"
+        ],
+        'cheese': [
+            "00000011100000",
+            "000001YYY10000",
+            "00001YYYYY1000",
+            "0001YY11YYY100",
+            "001YYYYYYYYY10",
+            "01YYY11YYYYYY1",
+            "1YYYYYYYY11YY1",
+            "1YYYYYYYYYYYY1",
+            "01111111111110"
+        ],
+        'bread': [
+            "00001111110000",
+            "0011OOOOOO1100",
+            "01OOOOOOOOOO10",
+            "1OOOOOOOOOOOO1",
+            "1OooooooooooO1",
+            "1OooWoooooooO1",
+            "1OooooooooooO1",
+            "1OOOOOOOOOOOO1",
+            "01111111111110"
+        ],
+        'lettuce': [
+            "00111001100000",
+            "01GGG101GG1000",
+            "1GGgGG1GGgG100",
+            "1GGgG11GGGgGG1",
+            "1gGG1GGgGG1gG1",
+            "1GGgGGgGGG1GG1",
+            "01gGGgGG1GGg10",
+            "0011GgGGGgG100",
+            "00001111111000"
+        ],
+        'pepper': [
+            "00000001110000",
+            "0000001GGg1000",
+            "000001GggG1000",
+            "0000011RR11000",
+            "00001RRRRD1000",
+            "0001LRRRRDD100",
+            "0001RRRRRDD100",
+            "0001RRRRDD1000",
+            "00001RRDD10000",
+            "000001RD100000",
+            "00000011000000"
+        ],
+        'tomato': [
+            "00001111100000",
+            "0001GG1GG10000",
+            "00111G1G111000",
+            "01RRR111RRR100",
+            "1LRRRRRRRRRD10",
+            "1LRRRRRRRRRRDD",
+            "1RRRRRRRRRRRDD",
+            "1RRRRRRRRRRRDD",
+            "01RRRRRRRRRDD0",
+            "0011RRRRRDD110",
+            "00001111111000"
+        ]
+    };
+
+    function renderMatrixToCanvas(matrixObj, size) {
+        const pCanvas = document.createElement('canvas');
+        pCanvas.width = size;
+        pCanvas.height = size;
+        const pCtx = pCanvas.getContext('2d');
+        pCtx.imageSmoothingEnabled = false;
+
+        const rows = matrixObj.length;
+        const cols = matrixObj[0].length;
+        const pixelSize = Math.floor(size / Math.max(rows, cols)) * 0.9;
+        const offsetX = (size - (cols * pixelSize)) / 2;
+        const offsetY = (size - (rows * pixelSize)) / 2;
+
+        pCtx.fillStyle = 'rgba(0,0,0,0.3)';
+        pCtx.fillRect(offsetX + pixelSize, offsetY + pixelSize*2, cols*pixelSize*0.9, rows*pixelSize*0.9);
+
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                let char = matrixObj[r][c];
+                if (char !== '0' && colorMap[char]) {
+                    pCtx.fillStyle = colorMap[char];
+                    pCtx.fillRect(offsetX + c * pixelSize, offsetY + r * pixelSize, pixelSize, pixelSize);
+                }
+            }
+        }
+        return pCanvas;
+    }
+
+    const sprites = {};
+    INGREDIENTS.forEach(ing => { 
+        sprites[ing.id] = renderMatrixToCanvas(spriteMatrices[ing.id], 64); 
+    });
+
+    function initGame() {
+        score = 0;
+        complaints = 0;
+        completedOrders = 0;
+        gameTime = 120;
+        currentOrderId = 0;
+        isPlaying = true;
+        isPaused = false;
+        activeItems = [];
+        sliceTrail = [];
+        splatters = [];
+        
+        // Remove focus from button to prevent spacebar issues
+        document.activeElement.blur(); 
+
+        document.getElementById('bgCanvas').style.display = 'none';
+
+        updateHUD();
+        startTimer();
+        generateNewOrder();
+
+        startScreen.classList.add('hidden');
+        resultScreen.classList.add('hidden');
+        document.getElementById('pause-modal').classList.add('hidden');
+        
+        lastSpawnTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function startTimer() {
+        if (gameTimerInterval) clearInterval(gameTimerInterval);
+        gameTimerInterval = setInterval(() => {
+            if (!isPlaying || isPaused) return;
+            gameTime--;
+            updateHUD();
+            updateDifficulty();
+            if (gameTime <= 0) {
+                endGame(true, "Vardiya süresi doldu! Tebrikler, vardiyayı başarıyla tamamladın.");
+            }
+        }, 1000);
+    }
+
+    function updateDifficulty() {
+        const elapsedTime = 120 - gameTime;
+        if (elapsedTime < 40) {
+            speedMultiplier = 1.0; recipeVisibilityDuration = 4000;
+        } else if (elapsedTime < 80) {
+            speedMultiplier = 1.2; recipeVisibilityDuration = 3000;
+        } else {
+            speedMultiplier = 1.5; recipeVisibilityDuration = 2000;
+        }
+    }
+
+    function updateHUD() {
+        scoreDisplay.textContent = score;
+        
+        // Large distinctive complaint indicators (Retro X marks)
+        let compText = '';
+        for (let i = 0; i < 3; i++) {
+            if (i < complaints) {
+                compText += '<span style="color:#ff3333; font-size:16px; font-weight:bold; margin:0 3px; text-shadow: 2px 2px 0px #660000;">X</span>';
+            } else {
+                compText += '<span style="color:#555; font-size:16px; font-weight:bold; margin:0 3px;">-</span>';
+            }
+        }
+        complaintsDisplay.innerHTML = compText;
+        
+        const mins = Math.floor(gameTime / 60).toString().padStart(2, '0');
+        const secs = (gameTime % 60).toString().padStart(2, '0');
+        timeDisplay.textContent = `${mins}:${secs}`;
+    }
+
+    function generateNewOrder() {
+        currentOrderId++; // Increment order counter so we can track newly spawned items
+        const recipeSize = Math.floor(Math.random() * 2) + 2; 
+        const shuffled = [...INGREDIENTS].sort(() => 0.5 - Math.random());
+        currentRecipe = shuffled.slice(0, recipeSize);
+        slicedIngredientsCurrentOrder = [];
+        showRecipeCard();
+    }
+
+    function showRecipeCard() {
+        recipeItemsContainer.innerHTML = '';
+        currentRecipe.forEach(ing => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'recipe-item';
+            const img = document.createElement('img');
+            img.src = sprites[ing.id].toDataURL();
+            const label = document.createElement('span');
+            label.textContent = ing.name;
+            itemDiv.appendChild(img);
+            itemDiv.appendChild(label);
+            recipeItemsContainer.appendChild(itemDiv);
+        });
+
+        recipeCard.classList.remove('hidden');
+        if (recipeHideTimeout) clearTimeout(recipeHideTimeout);
+        recipeHideTimeout = setTimeout(() => {
+            recipeCard.classList.add('hidden');
+        }, recipeVisibilityDuration);
+    }
+
+    function spawnFallingItem() {
+        if (activeItems.length >= 5) return;
+        const randomIng = INGREDIENTS[Math.floor(Math.random() * INGREDIENTS.length)];
+        const size = 80; 
+        const x = Math.random() * (CANVAS_WIDTH - size - 40) + 20;
+        
+        // Speeds between 0.75 and 2.0
+        const speed = (Math.random() * 1.25 + 0.75) * speedMultiplier;
+
+        activeItems.push({
+            id: randomIng.id,
+            name: randomIng.name,
+            color: randomIng.color,
+            x: x,
+            y: -size,
+            size: size,
+            speed: speed,
+            sliced: false,
+            orderId: currentOrderId // Tag item with the order it was spawned in
+        });
+    }
+
+    function addSplatter(x, y, color) {
+        splatters.push({
+            x: x,
+            y: y,
+            color: color,
+            life: 1.0,
+            size: Math.random() * 20 + 15
+        });
+    }
+
+    let lastSpawnTime = 0;
+    function gameLoop(timestamp) {
+        if (!isPlaying) return;
+        
+        if (isPaused) {
+            lastSpawnTime = timestamp; 
+            requestAnimationFrame(gameLoop);
+            return;
+        }
+
+        if (timestamp - lastSpawnTime > (1000 / speedMultiplier)) {
+            spawnFallingItem();
+            lastSpawnTime = timestamp;
+        }
+        
+        update();
+        drawGameCanvas();
+        
+        requestAnimationFrame(gameLoop);
+    }
+
+    function update() {
+        // Fade out splatters
+        splatters.forEach(s => s.life -= 0.015);
+        splatters = splatters.filter(s => s.life > 0);
+
+        for (let i = activeItems.length - 1; i >= 0; i--) {
+            let item = activeItems[i];
+            item.y += item.speed;
+
+            if (item.y > CANVAS_HEIGHT + 20) {
+                // Check if the item belongs to the CURRENT order. 
+                // If it's a leftover item from a previously completed order, we DO NOT penalize missing it.
+                if (item.orderId === currentOrderId) {
+                    const isRequired = currentRecipe.some(r => r.id === item.id);
+                    const alreadySliced = slicedIngredientsCurrentOrder.includes(item.id);
+                    
+                    if (isRequired && !alreadySliced) {
+                        score -= 10;
+                        complaints++;
+                        playSound('error'); // Missed item error sound
+                        if (complaints >= 3) {
+                            endGame(false, "Siparişteki bir malzemeyi kaçırdınız! 3 Şikâyet aldığınız için oyun bitti.");
+                            return;
+                        }
+                        updateHUD();
+                    }
+                }
+                activeItems.splice(i, 1);
+            }
+        }
+        
+        if (sliceTrail.length > 0) {
+            sliceTrail.forEach(p => p.life -= 0.1);
+            sliceTrail = sliceTrail.filter(p => p.life > 0);
+        }
+    }
+
+    function drawGameCanvas() {
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        
+        // Cutting board background (Warm Tones)
+        ctx.fillStyle = '#d99a5b';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        
+        // Wood grain lines
+        ctx.fillStyle = '#c08044';
+        ctx.fillRect(40, 0, 5, CANVAS_HEIGHT);
+        ctx.fillRect(120, 0, 8, CANVAS_HEIGHT);
+        ctx.fillRect(200, 0, 4, CANVAS_HEIGHT);
+        ctx.fillRect(300, 0, 10, CANVAS_HEIGHT);
+        ctx.fillRect(360, 0, 6, CANVAS_HEIGHT);
+        
+        // Subtle vertical lines for board texture
+        ctx.fillStyle = 'rgba(150, 80, 20, 0.15)';
+        for(let i=0; i<20; i++) {
+            // Use pseudo-random deterministic positions based on index to avoid flickering
+            ctx.fillRect(i*20 + (i%5)*3, 0, (i%3)+2, CANVAS_HEIGHT);
+        }
+        
+        // Shadow edges to look like a thick board
+        const grad = ctx.createLinearGradient(0, 0, 20, 0);
+        grad.addColorStop(0, 'rgba(0,0,0,0.4)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 20, CANVAS_HEIGHT);
+        
+        const grad2 = ctx.createLinearGradient(CANVAS_WIDTH-20, 0, CANVAS_WIDTH, 0);
+        grad2.addColorStop(0, 'rgba(0,0,0,0)');
+        grad2.addColorStop(1, 'rgba(0,0,0,0.4)');
+        ctx.fillStyle = grad2;
+        ctx.fillRect(CANVAS_WIDTH-20, 0, 20, CANVAS_HEIGHT);
+
+
+        // Draw Splatters
+        splatters.forEach(s => {
+            ctx.fillStyle = s.color;
+            ctx.globalAlpha = s.life * 0.7; 
+            ctx.fillRect(s.x, s.y, s.size, s.size);
+            ctx.fillRect(s.x - s.size*0.4, s.y + s.size*0.3, s.size*0.6, s.size*0.6);
+            ctx.fillRect(s.x + s.size*0.7, s.y - s.size*0.2, s.size*0.5, s.size*0.5);
+            ctx.fillRect(s.x + s.size*0.2, s.y + s.size*0.8, s.size*0.4, s.size*0.4);
+            ctx.globalAlpha = 1.0; 
+        });
+
+        // Draw items
+        activeItems.forEach(item => {
+            const sprite = sprites[item.id];
+            ctx.drawImage(sprite, item.x, item.y, item.size, item.size);
+        });
+
+        // Draw slice trail
+        if (sliceTrail.length > 1) {
+            ctx.beginPath();
+            ctx.strokeStyle = '#ff0055';
+            ctx.lineWidth = 5;
+            ctx.shadowColor = '#ff0055';
+            ctx.shadowBlur = 10;
+            for (let i = 0; i < sliceTrail.length - 1; i++) {
+                ctx.moveTo(sliceTrail[i].x, sliceTrail[i].y);
+                ctx.lineTo(sliceTrail[i+1].x, sliceTrail[i+1].y);
+            }
+            ctx.stroke();
+            ctx.shadowBlur = 0; 
+        }
+    }
+
+    function checkSlice(p1, p2) {
+        if (isPaused || !isPlaying) return;
+        
+        for (let i = activeItems.length - 1; i >= 0; i--) {
+            let item = activeItems[i];
+            if (item.sliced) continue;
+            
+            if (lineIntersectsRect(p1, p2, { x: item.x + 10, y: item.y + 10, width: item.size - 20, height: item.size - 20 })) {
+                item.sliced = true;
+                
+                // NO slice SFX anymore as requested. 
+                
+                addSplatter(item.x + item.size / 2, item.y + item.size / 2, item.color);
+                
+                handleSlicedItem(item);
+                activeItems.splice(i, 1);
+            }
+        }
+    }
+
+    function handleSlicedItem(item) {
+        const isRequired = currentRecipe.some(r => r.id === item.id);
+        const alreadySliced = slicedIngredientsCurrentOrder.includes(item.id);
+
+        if (isRequired) {
+            if (!alreadySliced) {
+                score += 10;
+                slicedIngredientsCurrentOrder.push(item.id);
+                if (slicedIngredientsCurrentOrder.length === currentRecipe.length) {
+                    score += 25; 
+                    completedOrders++;
+                    generateNewOrder();
+                }
+            }
+        } else {
+            // Only penalize if the item was explicitly spawned for the current active order.
+            // If they slice a leftover item from an old order, they don't get penalized (harmless slice).
+            if (item.orderId === currentOrderId) {
+                complaints++;
+                playSound('error'); // Wrong slice error sound
+                if (complaints >= 3) {
+                    endGame(false, "Yanlış malzeme kestiniz! 3 Şikâyet aldığınız için oyun bitti.");
+                }
+            }
+        }
+        updateHUD();
+    }
+
+    function lineIntersectsRect(p1, p2, rect) {
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        return (midX >= rect.x && midX <= rect.x + rect.width &&
+                midY >= rect.y && midY <= rect.y + rect.height);
+    }
+
+    function addTrailPoint(x, y) {
+        if (isPaused || !isPlaying) return;
+        const rect = canvas.getBoundingClientRect();
+        const canvasX = (x - rect.left) * (CANVAS_WIDTH / rect.width);
+        const canvasY = (y - rect.top) * (CANVAS_HEIGHT / rect.height);
+        sliceTrail.push({ x: canvasX, y: canvasY, life: 1.0 });
+        if (sliceTrail.length > 1) {
+            const p1 = sliceTrail[sliceTrail.length - 2];
+            const p2 = sliceTrail[sliceTrail.length - 1];
+            checkSlice(p1, p2);
+        }
+    }
+
+    // Input events
+    canvas.addEventListener('mousedown', (e) => { isMouseDown = true; sliceTrail = []; addTrailPoint(e.clientX, e.clientY); });
+    canvas.addEventListener('mousemove', (e) => { if (isMouseDown) addTrailPoint(e.clientX, e.clientY); });
+    window.addEventListener('mouseup', () => { isMouseDown = false; });
+    canvas.addEventListener('touchstart', (e) => { isMouseDown = true; sliceTrail = []; addTrailPoint(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+    canvas.addEventListener('touchmove', (e) => { if (isMouseDown) addTrailPoint(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+    canvas.addEventListener('touchend', () => { isMouseDown = false; });
+
+    function endGame(isSuccess, reason) {
+        isPlaying = false;
+        clearInterval(gameTimerInterval);
+        
+        // Clear the game canvas so the menu background is visible
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        
+        // Play SFX
+        playSound(isSuccess ? 'win' : 'lose');
+
+        document.getElementById('result-title').textContent = isSuccess ? "VARDİYA TAMAMLANDI!" : "VARDİYA BİTTİ";
+        document.getElementById('result-reason').textContent = reason;
+        document.getElementById('final-score').textContent = score;
+        document.getElementById('final-orders').textContent = completedOrders;
+        
+        recipeCard.classList.add('hidden');
+        resultScreen.classList.remove('hidden');
+        document.getElementById('bgCanvas').style.display = 'block';
+    }
+
+    // --- PAUSE MENU LOGIC ---
+    document.getElementById('pause-btn').addEventListener('click', () => {
+        if(!isPlaying || isPaused) return;
+        isPaused = true;
+        document.getElementById('pause-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('resume-btn').addEventListener('click', () => {
+        isPaused = false;
+        document.getElementById('pause-modal').classList.add('hidden');
+    });
+
+    document.getElementById('pause-menu-btn').addEventListener('click', () => {
+        isPaused = false;
+        isPlaying = false;
+        clearInterval(gameTimerInterval);
+        document.getElementById('pause-modal').classList.add('hidden');
+        recipeCard.classList.add('hidden');
+        document.getElementById('bgCanvas').style.display = 'block';
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT); // Clear game canvas to return cleanly
+        startScreen.classList.remove('hidden');
+    });
+
+    document.getElementById('pause-chat-btn').addEventListener('click', () => {
+        document.getElementById('chat-link-modal').classList.remove('hidden');
+    });
+
+    // --- BUTTON EVENT LISTENERS ---
+    document.getElementById('start-btn').addEventListener('click', () => {
+        // Init Audio Context properly on user interaction
+        if (!audioCtx) audioCtx = new AudioContext();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        initGame();
+    });
+    
+    document.getElementById('restart-btn').addEventListener('click', initGame);
+    
+    document.getElementById('menu-btn').addEventListener('click', () => { 
+        resultScreen.classList.add('hidden'); 
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT); // Clear game canvas to return cleanly
+        startScreen.classList.remove('hidden'); 
+    });
+
+    document.getElementById('how-to-btn').addEventListener('click', () => { document.getElementById('how-to-modal').classList.remove('hidden'); });
+    document.getElementById('close-how-to').addEventListener('click', () => { document.getElementById('how-to-modal').classList.add('hidden'); });
+    document.getElementById('chat-link-btn').addEventListener('click', () => { document.getElementById('chat-link-modal').classList.remove('hidden'); });
+    document.getElementById('close-chat-link').addEventListener('click', () => { document.getElementById('chat-link-modal').classList.add('hidden'); });
+    document.getElementById('copy-link-btn').addEventListener('click', () => {
+        const input = document.getElementById('chat-url-input');
+        input.select();
+        input.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(input.value);
+    });
+</script>
+</body>
+</html>
