@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kertenkele Avı - Piksel Orman</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        body {
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            background: #2b2b2b;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            border: 4px solid #4a3b2c;
+        }
+
+        canvas {
+            background-color: #6b8c42; /* Zemin taban rengi */
+            image-rendering: pixelated;
+            border: 16px solid #2d4c1e; /* Dış Çalılık Sınırı */
+            border-radius: 4px;
+        }
+
+        .ui-bar {
+            display: flex;
+            justify-content: space-between;
+            width: 512px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-shadow: 2px 2px #000;
+        }
+
+        .ui-item {
+            background: #333;
+            padding: 10px;
+            border: 2px solid #555;
+            border-radius: 5px;
+            color: #f1c40f;
+        }
+
+        #screens {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 30px;
+            border: 4px solid #fff;
+            border-radius: 10px;
+            z-index: 10;
+            width: 80%;
+        }
+
+        button {
+            background: #e74c3c;
+            color: white;
+            font-family: 'Press Start 2P', cursive;
+            border: none;
+            padding: 15px 20px;
+            margin-top: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0 4px #c0392b;
+            transition: 0.1s;
+        }
+
+        button:active {
+            box-shadow: 0 0 #c0392b;
+            transform: translateY(4px);
+        }
+
+        h1 { color: #2ecc71; font-size: 24px; text-shadow: 3px 3px #000; line-height: 1.5; }
+        h2 { color: #e74c3c; font-size: 20px; }
+        
+        .info-text {
+            font-size: 10px;
+            line-height: 1.8;
+            color: #ddd;
+            text-align: left;
+            margin-top: 20px;
+            background: #222;
+            padding: 15px;
+            border: 2px solid #444;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="ui-bar">
+        <div class="ui-item">SKOR: <span id="score">0</span></div>
+        <div class="ui-item">EN YÜKSEK: <span id="high-score">0</span></div>
+        <div class="ui-item">SÜRE: <span id="time">60</span></div>
+    </div>
+    
+    <canvas id="gameCanvas" width="512" height="512"></canvas>
+
+    <div id="screens">
+        <div id="start-screen">
+            <h1>KERTENKELE AVI</h1>
+            <div class="info-text">
+                <span style="color:#f1c40f">NASIL OYNANIR:</span><br><br>
+                - Kertenkeleyi YÖN TUŞLARI veya W,A,S,D ile hareket ettir. Hızlanmak için tuşa basılı tut.<br>
+                - Çalılıklara (sınıra) çarpmak öldürmez, sadece durdurur.<br>
+                - <span style="color:#e67e22">Normal Böcekler:</span> +10 Puan<br>
+                - <span style="color:#3498db">Nadir Böcekler:</span> +30 Puan & +5 Saniye<br>
+                - Tüm böcekler 5 saniye yenmezse kaybolur!<br>
+                - <span style="color:#e74c3c">YILANLAR:</span> Kenarlardaki çalılardan aniden çıkıp 2 kutu alanı işgal ederler. Uzak dur!<br>
+                - <span style="color:#9b59b6">KUŞ SALDIRISI:</span> 4 saniye hareketsiz kalırsan kuş gölgesi belirir (2x2 alan). Üstüne inerse ölürsün.
+            </div>
+            <button onclick="startGame()">OYUNA BAŞLA</button>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h2>OYUN BİTTİ!</h2>
+            <p id="death-reason" style="font-size:12px; color:#aaa; margin: 15px 0;"></p>
+            <p>SKORUN: <span id="final-score" style="color:#f1c40f">0</span></p>
+            <button onclick="resetGame()">TEKRAR OYNA</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    
+    const GRID_SIZE = 16;
+    const TILE_SIZE = 32;
+    
+    // Oyun Durumları
+    let lizard = [];
+    let currentDir = 'right';
+    let nextDir = 'right';
+    let isMoving = false;
+    let score = 0;
+    let time = 60;
+    let highScore = localStorage.getItem('kertenkeleHighScore') || 0;
+    document.getElementById('high-score').innerText = highScore;
+    
+    let lastMoveTime = 0; // Hareketsizlik takibi
+    let moveInterval = null;
+    let gameLoopInterval = null;
+    let timerInterval = null;
+    let gameActive = false;
+
+    // Varlıklar
+    let bugs = [];
+    let snakes = [];
+    let bird = null; // {x, y, state, timer}
+    
+    // Harita Zemin Dokuları (Baştan oluşturulur)
+    let groundMap = [];
+
+    function generateMap() {
+        groundMap = [];
+        for(let x=0; x<GRID_SIZE; x++) {
+            groundMap[x] = [];
+            for(let y=0; y<GRID_SIZE; y++) {
+                // Zemin rastgeleliği: %70 Çimen Yeşili, %30 Toprak Kahverengisi
+                let type = Math.random() > 0.7 ? 'dirt' : 'grass';
+                
+                // Süslemeler: %5 Taş, %5 Dal, %10 Yaprak
+                let decor = 'none';
+                let r = Math.random();
+                if(r < 0.05) decor = 'stone';
+                else if (r < 0.10) decor = 'branch';
+                else if (r < 0.20) decor = 'leaf';
+
+                groundMap[x][y] = { type, decor };
+            }
+        }
+    }
+
+    function initGame() {
+        lizard = [
+            {x: 8, y: 8}, // Baş
+            {x: 7, y: 8}, // Gövde
+            {x: 6, y: 8}  // Kuyruk
+        ];
+        currentDir = 'right';
+        nextDir = 'right';
+        isMoving = false;
+        score = 0;
+        time = 60;
+        bugs = [];
+        snakes = [];
+        bird = null;
+        lastMoveTime = Date.now();
+        generateMap();
+        updateUI();
+    }
+
+    function startGame() {
+        document.getElementById('screens').classList.add('hidden');
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        
+        initGame();
+        gameActive = true;
+        
+        gameLoopInterval = setInterval(gameLoop, 1000/60); // 60 FPS Render & Logic
+        timerInterval = setInterval(() => {
+            time--;
+            updateUI();
+            if(time <= 0) gameOver("Süre Doldu!");
+            
+            // Rastgele Böcek Çıkartma (Saniyede 1 şans)
+            if(Math.random() > 0.3) spawnBug();
+            
+            // Rastgele Yılan Çıkartma
+            if(Math.random() > 0.6) spawnSnake();
+            
+        }, 1000);
+    }
+
+    // --- GİRDİ (INPUT) SİSTEMİ (Basılı tutma destekli pürüzsüz hareket) ---
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+        if(!gameActive) return;
+        const key = e.key.toLowerCase();
+        
+        // Zıt yöne anında dönme mantığı
+        let requestedDir = null;
+        if(['w', 'arrowup'].includes(key)) requestedDir = 'up';
+        if(['s', 'arrowdown'].includes(key)) requestedDir = 'down';
+        if(['a', 'arrowleft'].includes(key)) requestedDir = 'left';
+        if(['d', 'arrowright'].includes(key)) requestedDir = 'right';
+
+        if(requestedDir) {
+            keys[requestedDir] = true;
+            
+            // Eğer tam tersi yöne basıldıysa anında geri dön
+            const opposites = { 'up':'down', 'down':'up', 'left':'right', 'right':'left' };
+            if (requestedDir === opposites[currentDir]) {
+                lizard.reverse(); // Kuyruk baş oldu
+                currentDir = requestedDir;
+                nextDir = requestedDir;
+            } else {
+                nextDir = requestedDir;
+            }
+
+            if(!isMoving) {
+                isMoving = true;
+                moveLizard(); // İlk adım
+                moveInterval = setInterval(moveLizard, 90); // Basılı tutuldukça hızlıca ilerle (Çevik)
+            }
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if(!gameActive) return;
+        const key = e.key.toLowerCase();
+        let releasedDir = null;
+        if(['w', 'arrowup'].includes(key)) releasedDir = 'up';
+        if(['s', 'arrowdown'].includes(key)) releasedDir = 'down';
+        if(['a', 'arrowleft'].includes(key)) releasedDir = 'left';
+        if(['d', 'arrowright'].includes(key)) releasedDir = 'right';
+
+        if(releasedDir) {
+            keys[releasedDir] = false;
+            // Eğer basılı başka yön tuşu kalmadıysa dur
+            if(!keys['up'] && !keys['down'] && !keys['left'] && !keys['right']) {
+                isMoving = false;
+                clearInterval(moveInterval);
+            } else {
+                // Başka tuş basılıysa yönü ona çevir
+                for (let k in keys) {
+                    if (keys[k]) nextDir = k;
+                }
+            }
+        }
+    });
+
+    function moveLizard() {
+        if(!gameActive) return;
+        currentDir = nextDir;
+        const head = { ...lizard[0] };
+
+        if(currentDir === 'up') head.y--;
+        if(currentDir === 'down') head.y++;
+        if(currentDir === 'left') head.x--;
+        if(currentDir === 'right') head.x++;
+
+        // Izgara Dışına Çıkma (Duvarlara çarpmak öldürmez, sadece hareketi durdurur)
+        if(head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
+            return; // Adım atılmaz
+        }
+
+        lizard.unshift(head);
+        lizard.pop(); // Büyüme yok, 3 kare kalır
+        lastMoveTime = Date.now(); // Hareketsizlik sayacını sıfırla
+
+        checkCollisions();
+    }
+
+    function checkCollisions() {
+        const head = lizard[0];
+
+        // Böcek yeme
+        for(let i=0; i<bugs.length; i++) {
+            if(bugs[i].x === head.x && bugs[i].y === head.y) {
+                if(bugs[i].type === 'rare') {
+                    score += 30;
+                    time += 5;
+                } else {
+                    score += 10;
+                }
+                bugs.splice(i, 1);
+                updateUI();
+                break;
+            }
+        }
+
+        // Yılana çarpma (Gövde dahil)
+        snakes.forEach(snake => {
+            lizard.forEach(part => {
+                // Yılanın kapladığı 2 kutuluk alanı kontrol et
+                let hit = false;
+                if(snake.dir === 'left' && part.y === snake.y && (part.x === snake.x || part.x === snake.x - 1)) hit = true;
+                if(snake.dir === 'right' && part.y === snake.y && (part.x === snake.x || part.x === snake.x + 1)) hit = true;
+                if(snake.dir === 'up' && part.x === snake.x && (part.y === snake.y || part.y === snake.y - 1)) hit = true;
+                if(snake.dir === 'down' && part.x === snake.x && (part.y === snake.y || part.y === snake.y + 1)) hit = true;
+                
+                if(hit) gameOver("Yılana çarptın!");
+            });
+        });
+    }
+
+    function spawnBug() {
+        const type = Math.random() > 0.8 ? 'rare' : 'normal';
+        let x, y;
+        
+        // Yılan bölgelerinde (kenarlarda) çıkma ihtimali yüksek
+        if(Math.random() > 0.5) {
+            x = Math.random() > 0.5 ? Math.floor(Math.random()*2) : GRID_SIZE - 1 - Math.floor(Math.random()*2);
+            y = Math.floor(Math.random() * GRID_SIZE);
+        } else {
+            x = Math.floor(Math.random() * GRID_SIZE);
+            y = Math.floor(Math.random() * GRID_SIZE);
+        }
+
+        bugs.push({
+            x, y, type,
+            spawnTime: Date.now()
+        });
+    }
+
+    function spawnSnake() {
+        const sides = ['top', 'bottom', 'left', 'right'];
+        const side = sides[Math.floor(Math.random() * sides.length)];
+        let x, y, dir;
+
+        if(side === 'top') { x = Math.floor(Math.random() * GRID_SIZE); y = 0; dir = 'down'; }
+        if(side === 'bottom') { x = Math.floor(Math.random() * GRID_SIZE); y = GRID_SIZE-1; dir = 'up'; }
+        if(side === 'left') { x = 0; y = Math.floor(Math.random() * GRID_SIZE); dir = 'right'; }
+        if(side === 'right') { x = GRID_SIZE-1; y = Math.floor(Math.random() * GRID_SIZE); dir = 'left'; }
+
+        snakes.push({ x, y, dir, spawnTime: Date.now() });
+    }
+
+    function updateLogic() {
+        const now = Date.now();
+
+        // Böceklerin ömrü (5 saniye)
+        bugs = bugs.filter(bug => now - bug.spawnTime < 5000);
+
+        // Yılanların pusu süresi (2.5 saniye)
+        snakes = snakes.filter(snake => now - snake.spawnTime < 2500);
+
+        // Kuş Saldırısı Mantığı (4 Saniye hareketsizlik)
+        if (now - lastMoveTime > 4000 && !bird) {
+            // Gölge tam başın olduğu bölgede 2x2 kaplar
+            bird = { 
+                x: Math.min(lizard[0].x, GRID_SIZE-2), // Taştırmamak için sınır
+                y: Math.min(lizard[0].y, GRID_SIZE-2), 
+                state: 'shadow', 
+                spawnTime: now 
+            };
+        }
+
+        if (bird) {
+            let elapsed = now - bird.spawnTime;
+            if (bird.state === 'shadow' && elapsed > 1500) {
+                bird.state = 'attack'; // Kuş indi!
+            }
+            if (bird.state === 'attack') {
+                // Kuş 2x2 alan kaplar. Kertenkele bu 4 kutudan birindeyse ölür.
+                let hit = lizard.some(part => 
+                    part.x >= bird.x && part.x <= bird.x + 1 && 
+                    part.y >= bird.y && part.y <= bird.y + 1
+                );
+                if (hit) gameOver("Kuşa av oldun! Hareketsiz kalma.");
+                
+                // Kuş 1 saniye yerde kalır uçar
+                if (elapsed > 2500) {
+                    bird = null;
+                    lastMoveTime = now; // Süreyi sıfırla ki hemen tekrar inmesin
+                }
+            }
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Zemin Çizimi
+        for(let x=0; x<GRID_SIZE; x++) {
+            for(let y=0; y<GRID_SIZE; y++) {
+                const cell = groundMap[x][y];
+                // Çimen vs Toprak Renkleri
+                ctx.fillStyle = cell.type === 'grass' ? '#5a7d35' : '#7b5c3e';
+                ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                
+                // Süslemeler
+                if (cell.decor === 'stone') {
+                    ctx.fillStyle = '#6b7074'; // Gri Taş
+                    ctx.fillRect(x * TILE_SIZE + 4, y * TILE_SIZE + 4, 12, 10);
+                    ctx.fillStyle = '#8f9499'; // Taş Parıltısı
+                    ctx.fillRect(x * TILE_SIZE + 4, y * TILE_SIZE + 4, 8, 4);
+                } else if (cell.decor === 'branch') {
+                    ctx.fillStyle = '#4a3219'; // Koyu Kahve Dal
+                    ctx.fillRect(x * TILE_SIZE + 4, y * TILE_SIZE + 14, 24, 4);
+                } else if (cell.decor === 'leaf') {
+                    ctx.fillStyle = '#3a5a1f'; // Koyu Yaprak
+                    ctx.fillRect(x * TILE_SIZE + 6, y * TILE_SIZE + 6, 8, 8);
+                    ctx.fillRect(x * TILE_SIZE + 14, y * TILE_SIZE + 10, 6, 6);
+                }
+            }
+        }
+
+        // Böcekleri Çiz
+        bugs.forEach(bug => {
+            const px = bug.x * TILE_SIZE;
+            const py = bug.y * TILE_SIZE;
+            if(bug.type === 'rare') {
+                ctx.fillStyle = '#3498db'; // Mavi-Altın Nadir Böcek
+                ctx.fillRect(px + 8, py + 8, 16, 16);
+                ctx.fillStyle = '#f1c40f';
+                ctx.fillRect(px + 12, py + 12, 8, 8);
+            } else {
+                ctx.fillStyle = '#c0392b'; // Kırmızı Normal Böcek (Uğur böceği gibi)
+                ctx.fillRect(px + 8, py + 8, 16, 16);
+                ctx.fillStyle = '#000'; // Benekler
+                ctx.fillRect(px + 10, py + 10, 4, 4);
+                ctx.fillRect(px + 18, py + 18, 4, 4);
+            }
+        });
+
+        // Yılanları Çiz (Çalıdan uzanan)
+        snakes.forEach(snake => {
+            ctx.fillStyle = '#e74c3c'; // Kırmızı Yılan
+            let sx = snake.x * TILE_SIZE;
+            let sy = snake.y * TILE_SIZE;
+            
+            // Kafa ve gövde (2 Kutu)
+            let w = TILE_SIZE, h = TILE_SIZE;
+            if(snake.dir === 'left') { sx -= TILE_SIZE; w = TILE_SIZE*2; }
+            if(snake.dir === 'right') { w = TILE_SIZE*2; }
+            if(snake.dir === 'up') { sy -= TILE_SIZE; h = TILE_SIZE*2; }
+            if(snake.dir === 'down') { h = TILE_SIZE*2; }
+            
+            ctx.fillRect(sx, sy, w, h);
+            
+            // Siyah Çizgiler (Desen)
+            ctx.fillStyle = '#000';
+            if(snake.dir === 'left' || snake.dir === 'right') {
+                ctx.fillRect(sx + 10, sy, 8, h);
+                ctx.fillRect(sx + 30, sy, 8, h);
+            } else {
+                ctx.fillRect(sx, sy + 10, w, 8);
+                ctx.fillRect(sx, sy + 30, w, 8);
+            }
+        });
+
+        // Kuş Gölgesi / İnişi
+        if (bird) {
+            const bx = bird.x * TILE_SIZE;
+            const by = bird.y * TILE_SIZE;
+            if (bird.state === 'shadow') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Gölge
+                ctx.fillRect(bx, by, TILE_SIZE*2, TILE_SIZE*2);
+            } else {
+                ctx.fillStyle = '#2c3e50'; // Koyu Kuş (İnmiş)
+                ctx.fillRect(bx, by, TILE_SIZE*2, TILE_SIZE*2);
+                ctx.fillStyle = '#e67e22'; // Gaga
+                ctx.fillRect(bx + TILE_SIZE - 10, by + TILE_SIZE - 10, 20, 20);
+            }
+        }
+
+        // Kertenkeleyi Çiz (Sarı/Turuncu, zeminle kontrast)
+        lizard.forEach((part, index) => {
+            const px = part.x * TILE_SIZE;
+            const py = part.y * TILE_SIZE;
+            
+            // Ana Gövde (Canlı Çöl Rengi)
+            ctx.fillStyle = '#f39c12'; 
+            ctx.fillRect(px + 4, py + 4, 24, 24);
+            
+            // Sırt Desenleri (Koyu Kahve)
+            ctx.fillStyle = '#5c4033'; 
+            ctx.fillRect(px + 10, py + 10, 12, 12);
+            
+            if (index === 0) {
+                // Gözler (Baş)
+                ctx.fillStyle = '#000';
+                if(currentDir === 'up') { ctx.fillRect(px+6, py+6, 6, 6); ctx.fillRect(px+20, py+6, 6, 6); }
+                if(currentDir === 'down') { ctx.fillRect(px+6, py+20, 6, 6); ctx.fillRect(px+20, py+20, 6, 6); }
+                if(currentDir === 'left') { ctx.fillRect(px+6, py+6, 6, 6); ctx.fillRect(px+6, py+20, 6, 6); }
+                if(currentDir === 'right') { ctx.fillRect(px+20, py+6, 6, 6); ctx.fillRect(px+20, py+20, 6, 6); }
+            } else {
+                // Bacaklar
+                ctx.fillStyle = '#d35400';
+                if(index === 1) { // Orta Gövde Bacakları
+                    ctx.fillRect(px - 2, py + 6, 6, 4);
+                    ctx.fillRect(px + 28, py + 6, 6, 4);
+                    ctx.fillRect(px - 2, py + 22, 6, 4);
+                    ctx.fillRect(px + 28, py + 22, 6, 4);
+                }
+            }
+        });
+    }
+
+    function gameLoop() {
+        if(!gameActive) return;
+        updateLogic();
+        draw();
+    }
+
+    function updateUI() {
+        document.getElementById('score').innerText = score;
+        document.getElementById('time').innerText = time;
+    }
+
+    function gameOver(reason) {
+        gameActive = false;
+        clearInterval(moveInterval);
+        clearInterval(gameLoopInterval);
+        clearInterval(timerInterval);
+
+        if(score > highScore) {
+            highScore = score;
+            localStorage.setItem('kertenkeleHighScore', highScore);
+        }
+
+        document.getElementById('screens').classList.remove('hidden');
+        document.getElementById('game-over-screen').classList.remove('hidden');
+        document.getElementById('death-reason').innerText = reason;
+        document.getElementById('final-score').innerText = score;
+        document.getElementById('high-score').innerText = highScore;
+    }
+
+    function resetGame() {
+        for(let k in keys) keys[k] = false;
+        startGame();
+    }
+</script>
+</body>
+</html>
